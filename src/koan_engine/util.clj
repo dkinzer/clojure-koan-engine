@@ -1,4 +1,5 @@
 (ns koan-engine.util
+  (::use [clojure.string :only  [split]])
   (:require [clojure.string :as s]
             [clojure.java.io :as io])
   (:import [java.net URLDecoder]))
@@ -29,32 +30,45 @@
        `(assert ~x)
        `(assert ~x ~msg))))
 
+(defn answered?
+  "Returns true if an attempt has been made to answer the koan
+  or false otherwise."
+  [expected actual] 
+  (let [problem (split 
+                  (str (pr-str expected) (pr-str actual)) #"\s+")
+        ] (contains? problem "__")))
+
 (defn expectations
   "Given an equality form (= expected actual) returns the hash-map 
   -- { exepected: expected-result,
-       actual: actual-result }"
+       actual: actual-result }.
+  Returns nil if no attempt has been made to answer the question."
   ;TODO Check that x is an equality form.
   ;TODO Handle more than two arguments.
-  [x] {
-       :expected (try (eval (second x))
-                      (catch Throwable e#
-                        (str 
-                          "Evaluation error -- " (.getMessage e#)))),
+  [x] (let [expected (second x)
+            actual (nth x 2)]
+        (if (answered? expected actual)
+          ({
+            :expected (try (eval expected)
+                           (catch Throwable e#
+                             (str 
+                               "Evaluation error -- " (.getMessage e#)))),
 
-       :actual (try (eval (nth x  2))
-                    (catch Throwable e#
-                      (str 
-                        "Evaluation error -- " (.getMessage e#))))
-       })
+            :actual (try (eval actual)
+                         (catch Throwable e#
+                           (str 
+                             "Evaluation error -- " (.getMessage e#))))})
+          nil)))
 
 (defn expectations_to_s
   "Given the results of fn(expectations) returns as formatted string
   with epected and actual restuls."
-  [results](str
-       "\n-------------\n"
-       "expected: " (:expected results) "\n"
-       "actual: " (:actual results)) )
-       "\n-------------\n"
+  [results] (if (= nil results)
+              ""
+              (str
+                "\n-------------\n"
+                "expected: " (:expected results) "\n"
+                "actual: " (:actual results))))
 
 
 (defmacro fancy-assert
